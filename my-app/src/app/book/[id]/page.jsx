@@ -1,37 +1,121 @@
 "use client";
-import { notFound } from "next/navigation";
+import { useEffect, useState } from "react";
+import { notFound, useParams } from "next/navigation";
 import AudioPlayer from "@/Components/AudioPlayer";
-import { featuredBooks } from "@/data/mockData";
 import Link from "next/link";
-import { useState, use } from "react";
 
-export default function BookSummary({ params }) {
-  const unwrappedParams = use(params); // Unwrap the params promise
+export default function BookSummary() {
+  const params = useParams();
+  const bookId = params.id;
+
+  const [book, setBook] = useState(null);
+  const [featuredBooks, setFeaturedBooks] = useState([]);
+  const [totalDuration, setTotalDuration] = useState(null);
   const [feedback, setFeedback] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const book = featuredBooks.find((b) => b.id === parseInt(unwrappedParams.id));
-  if (!book) notFound();
+  useEffect(() => {
+    async function fetchBook() {
+      try {
+        const [bookRes, allBooksRes] = await Promise.all([
+          fetch(`http://localhost:8000/user/books/${bookId}`),
+          fetch("http://localhost:8000/user/books"),
+        ]);
+
+        if (!bookRes.ok) throw new Error("Book not found");
+
+        const data = await bookRes.json();
+        const allBooks = await allBooksRes.json();
+
+        setBook(data);
+        setFeaturedBooks(allBooks);
+        await calculateTotalDuration(data);
+      } catch (err) {
+        console.error("Error fetching book:", err);
+        notFound();
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function calculateDurationFromUrl(url) {
+      return new Promise((resolve) => {
+        const audio = new Audio(url);
+        audio.addEventListener("loadedmetadata", () => {
+          resolve(audio.duration || 0);
+        });
+        audio.addEventListener("error", () => resolve(0));
+      });
+    }
+
+    async function calculateTotalDuration(book) {
+      let total = 0;
+
+      total += await calculateDurationFromUrl(book.audioUrl);
+
+      if (book.modules && Array.isArray(book.modules)) {
+        const moduleDurations = await Promise.all(
+          book.modules.map((mod) =>
+            mod.audioUrl ? calculateDurationFromUrl(mod.audioUrl) : 0
+          )
+        );
+        total += moduleDurations.reduce((acc, dur) => acc + dur, 0);
+      }
+
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = Math.floor(total % 60);
+
+      const formatted =
+        hours > 0
+          ? `${hours}h ${minutes}m${seconds > 0 ? ` ${seconds}s` : ""}`
+          : `${minutes}m${seconds > 0 ? ` ${seconds}s` : ""}`;
+
+      setTotalDuration(formatted);
+    }
+
+    if (bookId) fetchBook();
+  }, [bookId]);
 
   const handleSubmitFeedback = (e) => {
     e.preventDefault();
     console.log("Feedback submitted:", feedback);
-    setIsSubmitted(true);
-    setTimeout(() => setIsSubmitted(false), 3000);
-    setFeedback("");
+    fetch("http://localhost:8000/user/feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ bookId, feedback }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to submit feedback");
+        return res.json();
+      })
+      .then(() => {
+        setFeedback("");
+        setIsSubmitted(true);
+        setTimeout(() => setIsSubmitted(false), 3000);
+      })
+      .catch((err) => console.error("Error submitting feedback:", err));
   };
 
   const getCategoryColor = (category) => {
+    if (!category) return "from-gray-500 to-gray-600";
+    const key = category.trim().toLowerCase();
     const colors = {
-      "Self-help": "from-purple-500 to-pink-500",
-      Productivity: "from-green-500 to-emerald-500",
-      Sales: "from-red-500 to-orange-500",
-      Leadership: "from-blue-500 to-indigo-500",
-      Finance: "from-yellow-500 to-amber-500",
+      "self-help": "from-purple-500 to-pink-500",
+      productivity: "from-green-500 to-emerald-500",
+      sales: "from-red-500 to-orange-500",
+      leadership: "from-blue-500 to-indigo-500",
+      finance: "from-yellow-500 to-amber-500",
     };
-    return colors[category] || "from-gray-500 to-gray-600";
+    return colors[key] || "from-gray-500 to-gray-600";
   };
+
+  if (loading) return <div className="p-8 text-center">Loading book...</div>;
+  if (!book) return notFound();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50">
@@ -40,19 +124,13 @@ export default function BookSummary({ params }) {
         <nav className="mb-8">
           <ol className="flex items-center space-x-2 text-sm text-gray-600">
             <li>
-              <Link
-                href="/"
-                className="hover:text-indigo-600 transition-colors"
-              >
+              <Link href="/" className="hover:text-indigo-600">
                 Home
               </Link>
             </li>
             <li>/</li>
             <li>
-              <Link
-                href="/categories"
-                className="hover:text-indigo-600 transition-colors"
-              >
+              <Link href="/Categories" className="hover:text-indigo-600">
                 Categories
               </Link>
             </li>
@@ -69,74 +147,44 @@ export default function BookSummary({ params }) {
             )} p-8`}
           >
             <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-start">
-              <div className="flex-shrink-0">
-                <img
-                  src={book.coverImage}
-                  alt={book.title}
-                  className="w-48 h-64 rounded-2xl object-cover shadow-2xl border-4 border-white"
-                />
-              </div>
-              <div className="flex-1 text-center lg:text-left text-white">
-                <span className="inline-block px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold mb-4">
+              <img
+                src={book.coverImage}
+                alt={book.title}
+                className="w-48 h-64 rounded-2xl object-cover border-4 border-white shadow-xl"
+              />
+              <div className="text-white text-center lg:text-left flex-1">
+                <span className="inline-block bg-white/20 px-4 py-2 rounded-full text-sm font-semibold mb-4">
                   {book.category}
                 </span>
-                <h1 className="text-3xl lg:text-5xl font-bold mb-4 leading-tight">
+                <h1 className="text-3xl lg:text-5xl font-bold mb-4">
                   {book.title}
                 </h1>
-                <p className="text-xl mb-6 opacity-90">
+                <p className="text-xl mb-6">
                   by <span className="font-semibold">{book.author}</span>
                 </p>
 
-                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm">
-                  <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                    <svg
-                      className="w-5 h-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.414L11 9.586V6z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <span className="font-medium">{book.duration}</span>
-                  </div>
+                <div className="flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
+                  <span className="bg-white/20 px-4 py-2 rounded-full flex items-center space-x-2">
+                    ⏱️ <span>{totalDuration || "Calculating..."}</span>
+                  </span>
                   {book.rating && (
-                    <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                      <svg
-                        className="w-5 h-5 text-yellow-300"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      <span className="font-medium">{book.rating}</span>
-                    </div>
+                    <span className="bg-white/20 px-4 py-2 rounded-full flex items-center space-x-2">
+                      ⭐ <span>{book.rating}</span>
+                    </span>
                   )}
-                  {book.listeners && (
-                    <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
-                      <svg
-                        className="w-5 h-5"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
-                      </svg>
-                      <span>{book.listeners} listeners</span>
-                    </div>
+                  {book.numlisteners && (
+                    <span className="bg-white/20 px-4 py-2 rounded-full flex items-center space-x-2">
+                      👂 <span>{book.numlisteners} listeners</span>
+                    </span>
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Full Summary Audio */}
+          {/* Audio Summary */}
           <div className="p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm mr-3">
-                📖
-              </span>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
               Complete Book Summary
             </h2>
             <AudioPlayer
@@ -147,25 +195,17 @@ export default function BookSummary({ params }) {
           </div>
         </div>
 
-        {/* Book Overview */}
+        {/* Overview */}
         <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">
             About This Book
           </h2>
-          <div className="prose max-w-none">
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-400 p-6 rounded-r-2xl mb-6">
-              <p className="text-lg text-gray-800 leading-relaxed font-medium">
-                {book.summary}
-              </p>
-            </div>
-            <p className="text-gray-700 leading-relaxed text-lg">
-              {book.fullContent}
-            </p>
-          </div>
+          <p className="text-gray-800 mb-4">{book.summary}</p>
+          <p className="text-gray-600">{book.fullContent}</p>
         </div>
 
-        {/* Modules Section */}
-        {book.modules && (
+        {/* Modules */}
+        {book.modules?.length > 0 && (
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-8 flex items-center">
               <span className="w-10 h-10 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold mr-4">
@@ -174,47 +214,26 @@ export default function BookSummary({ params }) {
               Key Learning Modules
             </h2>
             <div className="space-y-6">
-              {book.modules.map((module, index) => (
-                <div
-                  key={index}
-                  className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
-                >
-                  <div className="p-8">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-4">
-                        <span className="w-8 h-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                          {index + 1}
-                        </span>
-                        <h3 className="text-xl font-bold text-gray-900">
-                          {module.title}
-                        </h3>
-                      </div>
-                      {module.duration && (
-                        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                          {module.duration}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-gray-700 mb-6 leading-relaxed text-lg pl-12">
-                      {module.description}
-                    </p>
-                    {module.audioUrl && (
-                      <div className="pl-12">
-                        <AudioPlayer
-                          audioUrl={module.audioUrl}
-                          title={module.title}
-                          transcript={module.transcript}
-                        />
-                      </div>
-                    )}
-                  </div>
+              {book.modules.map((mod, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-2xl shadow-md">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {idx + 1}. {mod.title}
+                  </h3>
+                  <p className="text-gray-700 mb-2">{mod.description}</p>
+                  {mod.audioUrl && (
+                    <AudioPlayer
+                      audioUrl={mod.audioUrl}
+                      title={mod.title}
+                      transcript={mod.transcript}
+                    />
+                  )}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Customer Feedback Section */}
+        {/* Feedback */}
         <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8 mb-8">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -240,29 +259,16 @@ export default function BookSummary({ params }) {
               </h4>
               {isSubmitted ? (
                 <div className="bg-green-100 border border-green-200 text-green-800 p-4 rounded-lg flex items-center">
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>
-                    Thanks for your suggestion! We'll consider adding this book
-                    to our library.
-                  </span>
+                  ✅ Thanks for your suggestion! We'll consider adding this book
+                  to our library.
                 </div>
               ) : (
                 <form onSubmit={handleSubmitFeedback} className="space-y-4">
                   <textarea
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
-                    className="w-full p-4 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                    placeholder="Which book should we summarize next? Tell us the title and author, and why you think it would be valuable..."
+                    className="w-full p-4 rounded-lg border border-gray-300 text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    placeholder="Which book should we summarize next?"
                     rows={4}
                     required
                   />
@@ -280,84 +286,54 @@ export default function BookSummary({ params }) {
           )}
         </div>
 
-        {/* Key Takeaways */}
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Key Takeaways
-          </h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            {[
-              "Master the fundamental principles outlined in the book",
-              "Apply practical strategies for immediate implementation",
-              "Develop long-term habits for sustained personal growth",
-              "Learn from real-world examples and case studies",
-            ].map((takeaway, index) => (
-              <div key={index} className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
+        {/* More from Category */}
+        {featuredBooks.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8 mb-8">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">
+              More from {book.category}
+            </h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              {featuredBooks
+                .filter((b) => b.category === book.category && b.id !== book.id)
+                .slice(0, 2)
+                .map((relatedBook) => (
+                  <Link
+                    key={relatedBook.id}
+                    href={`/book/${relatedBook.id}`}
+                    className="flex items-center space-x-4 p-6 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors group"
                   >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
+                    <img
+                      src={relatedBook.coverImage}
+                      alt={relatedBook.title}
+                      className="w-16 h-20 rounded-lg object-cover group-hover:shadow-md transition-shadow"
                     />
-                  </svg>
-                </div>
-                <p className="text-gray-700">{takeaway}</p>
-              </div>
-            ))}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+                        {relatedBook.title}
+                      </h4>
+                      <p className="text-sm text-gray-600 mb-1">
+                        by {relatedBook.author}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {relatedBook.duration}
+                      </p>
+                    </div>
+                    <svg
+                      className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </Link>
+                ))}
+            </div>
           </div>
-        </div>
-
-        {/* Related Books */}
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6">
-            More from {book.category}
-          </h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            {featuredBooks
-              .filter((b) => b.category === book.category && b.id !== book.id)
-              .slice(0, 2)
-              .map((relatedBook) => (
-                <Link
-                  key={relatedBook.id}
-                  href={`/book/${relatedBook.id}`}
-                  className="flex items-center space-x-4 p-6 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors group"
-                >
-                  <img
-                    src={relatedBook.coverImage}
-                    alt={relatedBook.title}
-                    className="w-16 h-20 rounded-lg object-cover group-hover:shadow-md transition-shadow"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
-                      {relatedBook.title}
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-1">
-                      by {relatedBook.author}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {relatedBook.duration}
-                    </p>
-                  </div>
-                  <svg
-                    className="w-5 h-5 text-gray-400 group-hover:text-indigo-600 transition-colors"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </Link>
-              ))}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

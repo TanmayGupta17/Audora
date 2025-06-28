@@ -26,7 +26,7 @@ export default function AuthPage() {
     setIsSignupLoading(true);
 
     try {
-      const response = await fetch("/user/signup", {
+      const response = await fetch("http:localhost:8000/user/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -53,7 +53,7 @@ export default function AuthPage() {
     setIsLoginLoading(true);
 
     try {
-      const response = await fetch("/user/login", {
+      const response = await fetch("http://localhost:8000/user/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

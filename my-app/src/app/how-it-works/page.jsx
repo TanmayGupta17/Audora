@@ -12,7 +12,7 @@ export default function HowItWorks() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            How LearnWise Works
+            How Audora Works
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Transform your learning with our audio-first approach to book
@@ -208,7 +208,7 @@ export default function HowItWorks() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/categories"
+                href="/Categories"
                 className="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-gray-100 transition-colors inline-flex items-center space-x-2 shadow-lg"
               >
                 <span>Browse Library</span>

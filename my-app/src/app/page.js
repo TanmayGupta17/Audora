@@ -1,8 +1,40 @@
+"use client";
 import Link from "next/link";
-import BookCard from "@/Components/BookCard";
-import { featuredBooks } from "@/data/mockData";
+import { useEffect, useState } from "react";
 
 export default function Homepage() {
+  const [books, setBooks] = useState([]);
+  const [demoBookId, setDemoBookId] = useState(null); // Which book's audio is showing
+  const [isPlaying, setIsPlaying] = useState(null); // Which book's audio is playing
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Replace with your real auth logic
+
+  useEffect(() => {
+    async function fetchBooks() {
+      try {
+        const res = await fetch("http://localhost:8000/user/books");
+        const data = await res.json();
+        console.log("Fetched books:", data); // Add this line to debug
+        setBooks(data.slice(0, 3)); // Only 3 books
+      } catch (err) {
+        setBooks([]);
+      }
+    }
+    fetchBooks();
+  }, []);
+
+  const handleDemoClick = (bookId) => {
+    setDemoBookId(bookId);
+    setIsPlaying(bookId);
+  };
+
+  const handleListenClick = (bookId) => {
+    if (!isLoggedIn) {
+      window.location.href = "/Authentication";
+      return;
+    }
+    // If logged in, go to book page
+    window.location.href = `/book/${bookId}`;
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -137,28 +169,49 @@ export default function Homepage() {
                 Hand-picked book summaries to accelerate your personal growth
               </p>
             </div>
-            <Link
-              href="/categories"
-              className="text-indigo-600 hover:text-indigo-700 font-semibold text-lg flex items-center group"
-            >
-              View All
-              <svg
-                className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </Link>
           </div>
-
-          <div className="space-y-8">
-            {featuredBooks.map((book) => (
-              <BookCard key={book.id} book={book} />
+          <div className="grid md:grid-cols-3 gap-8">
+            {books.map((book) => (
+              <div
+                key={book._id}
+                className="relative bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden group transition-transform hover:scale-105 p-6 flex flex-col"
+              >
+                <img
+                  src={book.coverImage}
+                  alt={book.title}
+                  className="w-full h-56 object-cover rounded-xl mb-4"
+                />
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  {book.title}
+                </h3>
+                <p className="text-gray-600 mb-4">by {book.author}</p>
+                <div className="flex gap-2 justify-between mt-auto">
+                  <button
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-2 rounded-lg font-semibold transition-all hover:scale-105"
+                    onClick={() => handleDemoClick(book._id)}
+                  >
+                    ▶ Demo
+                  </button>
+                  <button
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg font-semibold transition-all hover:scale-105 "
+                    onClick={() => handleListenClick(book._id)}
+                  >
+                    Listen Now
+                  </button>
+                </div>
+                {/* Show audio player only if Demo was clicked for this book */}
+                {demoBookId === book._id && (
+                  <div className="mt-4">
+                    <audio
+                      src={book.audioUrl}
+                      controls
+                      autoPlay
+                      onPlay={() => setIsPlaying(book._id)}
+                      onPause={() => setIsPlaying(null)}
+                    />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -176,7 +229,7 @@ export default function Homepage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/categories"
+                href="/Categories"
                 className="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-gray-100 transition-colors inline-flex items-center space-x-2 shadow-lg"
               >
                 <span>Start Learning Today</span>

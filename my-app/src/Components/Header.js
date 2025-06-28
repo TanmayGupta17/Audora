@@ -39,7 +39,7 @@ export default function Header() {
               Home
             </Link>
             <Link
-              href="/categories"
+              href="/Categories"
               className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                 pathname === "/categories"
                   ? "bg-indigo-50 text-indigo-700 shadow-sm"

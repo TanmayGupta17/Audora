@@ -9,6 +9,7 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const User = require("./models/user");
 //Routers
 const userRouter = require("./routes/user");
+const uploadRouter = require("./routes/upload");
 
 connectDB(process.env.MONGO_URI)
   .then(() => {
@@ -23,6 +24,12 @@ const app = express();
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}/`);
 });
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(session({ secret: "secret", resave: false, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -92,3 +99,5 @@ app.get(
 // });
 
 app.use("/user", userRouter);
+
+app.use("/upload", uploadRouter);
