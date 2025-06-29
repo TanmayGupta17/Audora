@@ -90,7 +90,7 @@ app.get(
   passport.authenticate("google", { failureRedirect: "/Authentication" }),
   (req, res) => {
     // <-- fix parameter order here
-    res.redirect("http://localhost:3000/");
+    res.redirect("http://localhost:3000/HomePage");
   }
 );
 

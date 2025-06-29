@@ -21,7 +21,12 @@ export default function Homepage() {
     }
     fetchBooks();
   }, []);
-
+  useEffect(() => {
+    // Example: check for a token in localStorage
+    const token = localStorage.getItem("token");
+    console.log("Token from localStorage:", token); // Debugging line
+    setIsLoggedIn(!!token);
+  }, []);
   const handleDemoClick = (bookId) => {
     setDemoBookId(bookId);
     setIsPlaying(bookId);
@@ -29,12 +34,16 @@ export default function Homepage() {
 
   const handleListenClick = (bookId) => {
     if (!isLoggedIn) {
+      // Save the intended page
+      sessionStorage.setItem("redirectAfterLogin", `/book/${bookId}`);
       window.location.href = "/Authentication";
       return;
     }
-    // If logged in, go to book page
+
+    // Already logged in
     window.location.href = `/book/${bookId}`;
   };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -62,7 +71,7 @@ export default function Homepage() {
           {/* Demo and Get Started Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <Link
-              href="/book/1"
+              href="/book/685fdfc000383c58a789100b"
               className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-8 py-4 rounded-2xl font-semibold text-lg transition-all transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center space-x-2"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">

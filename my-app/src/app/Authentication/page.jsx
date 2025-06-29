@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { redirect } from "next/dist/server/api-utils";
 
 export default function AuthPage() {
   // State for form handling
@@ -36,9 +37,11 @@ export default function AuthPage() {
 
       if (response.ok) {
         console.log("Signup successful");
+        res.redirect("/HomePage");
         // Handle successful signup (redirect, show message, etc.)
       } else {
         console.error("Signup failed");
+        res.redirect("/Authentication");
       }
     } catch (error) {
       console.error("Signup error:", error);
@@ -63,9 +66,11 @@ export default function AuthPage() {
 
       if (response.ok) {
         console.log("Login successful");
+        res.redirect("/HomePage");
         // Handle successful login (redirect, store token, etc.)
       } else {
         console.error("Login failed");
+        res.redirect("/Authentication");
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -89,6 +94,17 @@ export default function AuthPage() {
     });
   };
 
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      const redirectPath = sessionStorage.getItem("redirectAfterLogin");
+      sessionStorage.removeItem("redirectAfterLogin");
+
+      // Go to intended path or home
+      window.location.href = redirectPath || "/";
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -100,7 +116,7 @@ export default function AuthPage() {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-gray-900 text-2xl leading-none">
-                LearnWise
+                Audora
               </span>
               <span className="text-sm text-gray-500 leading-none">
                 Audio-First Learning
@@ -108,7 +124,7 @@ export default function AuthPage() {
             </div>
           </Link>
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Welcome to LearnWise
+            Welcome to Audora
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Join thousands of learners accelerating their growth with
@@ -130,8 +146,14 @@ export default function AuthPage() {
             </div>
 
             {/* Google Sign Up Button */}
-            <Link
-              href="http://localhost:8000/auth/google"
+            <button
+              onClick={() => {
+                sessionStorage.setItem(
+                  "redirectAfterLogin",
+                  window.location.pathname
+                );
+                window.location.href = "http://localhost:8000/auth/google";
+              }}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 mb-6"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -141,7 +163,7 @@ export default function AuthPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               <span>Sign up with Google</span>
-            </Link>
+            </button>
 
             {/* Divider */}
             <div className="relative mb-6">
@@ -295,8 +317,14 @@ export default function AuthPage() {
             </div>
 
             {/* Google Login Button */}
-            <Link
-              href="http://localhost:8000/auth/google"
+            <button
+              onClick={() => {
+                sessionStorage.setItem(
+                  "redirectAfterLogin",
+                  window.location.pathname
+                );
+                window.location.href = "http://localhost:8000/auth/google";
+              }}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center justify-center space-x-3 mb-6"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -306,7 +334,7 @@ export default function AuthPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
               <span>Log in with Google</span>
-            </Link>
+            </button>
 
             {/* Divider */}
             <div className="relative mb-6">
