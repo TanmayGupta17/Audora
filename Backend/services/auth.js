@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const secret = "TanmayGupta";
+require("dotenv").config();
 
 function setUser(user) {
   const token = jwt.sign(
@@ -9,7 +9,7 @@ function setUser(user) {
       name: user.name,
       email: user.email,
     },
-    secret,
+    process.env.SECRET,
     {
       expiresIn: "7 days",
     }
@@ -19,7 +19,7 @@ function setUser(user) {
 
 function getUser(token) {
   try {
-    const decoded = jwt.verify(token, secret);
+    const decoded = jwt.verify(token, process.env.SECRET);
     console.log(decoded);
     return decoded;
   } catch (error) {
